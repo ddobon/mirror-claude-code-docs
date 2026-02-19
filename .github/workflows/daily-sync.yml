@@ -6,6 +6,9 @@ on:
     - cron: '0 23 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
+permissions:
+  contents: write  # Required for git push
+
 jobs:
   sync:
     runs-on: ubuntu-latest
