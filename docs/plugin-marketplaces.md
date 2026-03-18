@@ -221,7 +221,7 @@ Once a plugin is cloned or copied into the local machine, it is copied into the 
 
 | Source        | Type                            | Fields                             | Notes                                                                               |
 | ------------- | ------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------- |
-| Relative path | `string` (e.g. `"./my-plugin"`) | —                                  | Local directory within the marketplace repo. Must start with `./`                   |
+| Relative path | `string` (e.g. `"./my-plugin"`) | none                               | Local directory within the marketplace repo. Must start with `./`                   |
 | `github`      | object                          | `repo`, `ref?`, `sha?`             |                                                                                     |
 | `url`         | object                          | `url`, `ref?`, `sha?`              | Git URL source                                                                      |
 | `git-subdir`  | object                          | `url`, `path`, `ref?`, `sha?`      | Subdirectory within a git repo. Clones sparsely to minimize bandwidth for monorepos |
@@ -458,7 +458,7 @@ This example shows a plugin entry using many of the optional fields, including c
 Key things to notice:
 
 * **`commands` and `agents`**: You can specify multiple directories or individual files. Paths are relative to the plugin root.
-* **`${CLAUDE_PLUGIN_ROOT}`**: Use this variable in hooks and MCP server configs to reference files within the plugin's installation directory. This is necessary because plugins are copied to a cache location when installed.
+* **`${CLAUDE_PLUGIN_ROOT}`**: use this variable in hooks and MCP server configs to reference files within the plugin's installation directory. This is necessary because plugins are copied to a cache location when installed. For dependencies or state that should survive plugin updates, use [`${CLAUDE_PLUGIN_DATA}`](/en/plugins-reference#persistent-data-directory) instead.
 * **`strict: false`**: Since this is set to false, the plugin doesn't need its own `plugin.json`. The marketplace entry defines everything. See [Strict mode](#strict-mode) below.
 
 ### Strict mode
@@ -561,6 +561,8 @@ For full configuration options, see [Plugin settings](/en/settings#plugin-settin
 ### Pre-populate plugins for containers
 
 For container images and CI environments, you can pre-populate a plugins directory at build time so Claude Code starts with marketplaces and plugins already available, without cloning anything at runtime. Set the `CLAUDE_CODE_PLUGIN_SEED_DIR` environment variable to point at this directory.
+
+To layer multiple seed directories, separate paths with `:` on Unix or `;` on Windows. Claude Code searches each directory in order, and the first seed that contains a given marketplace or plugin cache wins.
 
 The seed directory mirrors the structure of `~/.claude/plugins`:
 
