@@ -12,7 +12,11 @@
 
 A channel is an MCP server that pushes events into your running Claude Code session, so Claude can react to things that happen while you're not at the terminal. Channels can be two-way: Claude reads the event and replies back through the same channel, like a chat bridge. Events only arrive while the session is open, so for an always-on setup you run Claude in a background process or persistent terminal.
 
+Unlike integrations that spawn a fresh cloud session or wait to be polled, the event arrives in the session you already have open: see [how channels compare](#how-channels-compare).
+
 You install a channel as a plugin and configure it with your own credentials. Telegram and Discord are included in the research preview.
+
+When Claude replies through a channel, you see the inbound message in your terminal but not the reply text. The terminal shows the tool call and a confirmation (like "sent"), and the actual reply appears on the other platform.
 
 This page covers:
 
@@ -20,23 +24,144 @@ This page covers:
 * [Install and run a channel](#quickstart) with fakechat, a localhost demo
 * [Who can push messages](#security): sender allowlists and how you pair
 * [Enable channels for your organization](#enterprise-controls) on Team and Enterprise
+* [How channels compare](#how-channels-compare) to web sessions, Slack, MCP, and Remote Control
 
 To build your own channel, see the [Channels reference](/en/channels-reference).
 
 ## Supported channels
 
-Each supported channel is a plugin. All of them require [Bun](https://bun.sh). The general flow is:
+Each supported channel is a plugin that requires [Bun](https://bun.sh). For a hands-on demo of the plugin flow before connecting a real platform, try the [fakechat quickstart](#quickstart).
 
-1. Install the plugin: `/plugin install <name>@claude-plugins-official`
-2. Configure credentials with the `/<name>:configure` command the plugin adds
-3. Restart with `claude --channels plugin:<name>@claude-plugins-official`
+<Tabs>
+  <Tab title="Telegram">
+    View the full [Telegram plugin source](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/telegram).
 
-The table shows what each plugin needs. Each README has the full platform-specific walkthrough. For a hands-on demo of this flow, try the [fakechat quickstart](#quickstart).
+    <Steps>
+      <Step title="Create a Telegram bot">
+        Open [BotFather](https://t.me/BotFather) in Telegram and send `/newbot`. Give it a display name and a unique username ending in `bot`. Copy the token BotFather returns.
+      </Step>
 
-| Plugin   | What you need first                                                                                                                                                                        | Configure after install                               | Setup instructions                                                                                  |
-| :------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
-| Telegram | A bot token from Telegram's [BotFather](https://t.me/BotFather)                                                                                                                            | `/telegram:configure <token>`, then [pair](#security) | [README](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/telegram) |
-| Discord  | A bot from the [Developer Portal](https://discord.com/developers/applications) with [Message Content Intent](https://discord.com/developers/docs/events/gateway#message-content-intent) on | `/discord:configure <token>`, then [pair](#security)  | [README](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/discord)  |
+      <Step title="Install the plugin">
+        In Claude Code, run:
+
+        ```
+        /plugin install telegram@claude-plugins-official
+        ```
+
+        If Claude Code reports that the plugin is not found in any marketplace, run `/plugin marketplace add anthropics/claude-plugins-official` first and retry the install.
+      </Step>
+
+      <Step title="Configure your token">
+        Run the configure command with the token from BotFather:
+
+        ```
+        /telegram:configure <token>
+        ```
+
+        This saves it to `~/.claude/channels/telegram/.env`. You can also set `TELEGRAM_BOT_TOKEN` in your shell environment before launching Claude Code.
+      </Step>
+
+      <Step title="Restart with channels enabled">
+        Exit Claude Code and restart with the channel flag. This starts the Telegram plugin, which begins polling for messages from your bot:
+
+        ```bash  theme={null}
+        claude --channels plugin:telegram@claude-plugins-official
+        ```
+      </Step>
+
+      <Step title="Pair your account">
+        Open Telegram and send any message to your bot. The bot replies with a pairing code.
+
+        <Note>If your bot doesn't respond, make sure Claude Code is running with `--channels` from the previous step. The bot can only reply while the channel is active.</Note>
+
+        Back in Claude Code, run:
+
+        ```
+        /telegram:access pair <code>
+        ```
+
+        Then lock down access so only your account can send messages:
+
+        ```
+        /telegram:access policy allowlist
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Discord">
+    View the full [Discord plugin source](https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/discord).
+
+    <Steps>
+      <Step title="Create a Discord bot">
+        Go to the [Discord Developer Portal](https://discord.com/developers/applications), click **New Application**, and name it. In the **Bot** section, create a username, then click **Reset Token** and copy the token.
+      </Step>
+
+      <Step title="Enable Message Content Intent">
+        In your bot's settings, scroll to **Privileged Gateway Intents** and enable **Message Content Intent**.
+      </Step>
+
+      <Step title="Invite the bot to your server">
+        Go to **OAuth2 > URL Generator**. Select the `bot` scope and enable these permissions:
+
+        * View Channels
+        * Send Messages
+        * Send Messages in Threads
+        * Read Message History
+        * Attach Files
+        * Add Reactions
+
+        Open the generated URL to add the bot to your server.
+      </Step>
+
+      <Step title="Install the plugin">
+        In Claude Code, run:
+
+        ```
+        /plugin install discord@claude-plugins-official
+        ```
+
+        If Claude Code reports that the plugin is not found in any marketplace, run `/plugin marketplace add anthropics/claude-plugins-official` first and retry the install.
+      </Step>
+
+      <Step title="Configure your token">
+        Run the configure command with the bot token you copied:
+
+        ```
+        /discord:configure <token>
+        ```
+
+        This saves it to `~/.claude/channels/discord/.env`. You can also set `DISCORD_BOT_TOKEN` in your shell environment before launching Claude Code.
+      </Step>
+
+      <Step title="Restart with channels enabled">
+        Exit Claude Code and restart with the channel flag. This connects the Discord plugin so your bot can receive and respond to messages:
+
+        ```bash  theme={null}
+        claude --channels plugin:discord@claude-plugins-official
+        ```
+      </Step>
+
+      <Step title="Pair your account">
+        DM your bot on Discord. The bot replies with a pairing code.
+
+        <Note>If your bot doesn't respond, make sure Claude Code is running with `--channels` from the previous step. The bot can only reply while the channel is active.</Note>
+
+        Back in Claude Code, run:
+
+        ```
+        /discord:access pair <code>
+        ```
+
+        Then lock down access so only your account can send messages:
+
+        ```
+        /discord:access policy allowlist
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
 
 You can also [build your own channel](/en/channels-reference) for systems that don't have a plugin yet.
 
@@ -60,7 +185,7 @@ To try the fakechat demo, you'll need:
     /plugin install fakechat@claude-plugins-official
     ```
 
-    Fakechat is in the `claude-plugins-official` marketplace, which is added automatically for most setups. If you don't have it, run `/plugin marketplace add anthropics/claude-plugins-official` first.
+    If Claude Code reports that the plugin is not found in any marketplace, run `/plugin marketplace add anthropics/claude-plugins-official` first and retry the install.
   </Step>
 
   <Step title="Restart with the channel enabled">
@@ -92,7 +217,14 @@ If Claude hits a permission prompt while you're away from the terminal, the sess
 
 ## Security
 
-Every approved channel plugin maintains a sender allowlist: only IDs you've added can push messages, and everyone else is silently dropped. Telegram and Discord bootstrap the list by pairing: you DM the bot, it replies with a code, you approve the code in your Claude Code session, and your ID is added. Each plugin's README walks through its setup.
+Every approved channel plugin maintains a sender allowlist: only IDs you've added can push messages, and everyone else is silently dropped.
+
+Telegram and Discord bootstrap the list by pairing:
+
+1. Find your bot in Telegram or Discord and send it any message
+2. The bot replies with a pairing code
+3. In your Claude Code session, approve the code when prompted
+4. Your sender ID is added to the allowlist
 
 On top of that, you control which servers are enabled each session with `--channels`, and on Team and Enterprise plans your organization controls availability with [`channelsEnabled`](#enterprise-controls).
 
@@ -122,6 +254,22 @@ During the preview, `--channels` only accepts plugins from an Anthropic-maintain
 To test a channel you're building, use `--dangerously-load-development-channels`. See [Test during the research preview](/en/channels-reference#test-during-the-research-preview) for information about testing custom channels that you build.
 
 Report issues or feedback on the [Claude Code GitHub repository](https://github.com/anthropics/claude-code/issues).
+
+## How channels compare
+
+Several Claude Code features connect to systems outside the terminal, each suited to a different kind of work:
+
+| Feature                                              | What it does                                                          | Good for                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
+| [Claude Code on the web](/en/claude-code-on-the-web) | Runs tasks in a fresh cloud sandbox, cloned from GitHub               | Delegating self-contained async work you check on later   |
+| [Claude in Slack](/en/slack)                         | Spawns a web session from an `@Claude` mention in a channel or thread | Starting tasks directly from team conversation context    |
+| Standard [MCP server](/en/mcp)                       | Claude queries it during a task; nothing is pushed to the session     | Giving Claude on-demand access to read or query a system  |
+| [Remote Control](/en/remote-control)                 | You drive your local session from claude.ai or the Claude mobile app  | Steering an in-progress session while away from your desk |
+
+Channels fill the gap in that list by pushing events from non-Claude sources into your already-running local session.
+
+* **Chat bridge**: ask Claude something from your phone via Telegram or Discord, and the answer comes back in the same chat while the work runs on your machine against your real files.
+* **[Webhook receiver](/en/channels-reference#example-build-a-webhook-receiver)**: a webhook from CI, your error tracker, a deploy pipeline, or other external service arrives where Claude already has your files open and remembers what you were debugging.
 
 ## Next steps
 
